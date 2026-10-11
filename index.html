@@ -69,7 +69,8 @@ svg .L-FRAME,svg .L-TITLE{stroke:var(--d-dim);fill:none;stroke-width:.8}
 svg .L-FRAME2{stroke:var(--d-dim);fill:none;stroke-width:2}
 svg .lg{fill:var(--logo-green)}
 svg text.b{font-weight:700}
-svg text.sm{font-family:Arial,Helvetica,sans-serif}
+svg text.sm{font-family:'Arial Narrow',Arial,Helvetica,sans-serif}
+.sheetbox svg text{font-family:'Arial Narrow','Arial',sans-serif}
 .brand span{font-family:var(--f-display);font-weight:600;font-size:1.3rem;letter-spacing:.02em}
 .brand small{color:var(--muted);font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .total-chip{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
@@ -819,6 +820,7 @@ function composeSheet(V, R, v, paper){
 
 /* ---- DXF (R12 ASCII). Geometry at true size in mm; the A3 frame + title block are scaled up by N
        so the sheet plots at 1:N on A3 (use Plot scale 1:N, or 1 mm = N units). ---- */
+const DXF_FONT = {regular:'arialnarrow.ttf', bold:'arialnarrow_bold.ttf'};   // file names as installed from Regen's Arial Narrow pack
 function toDXF(sheet){
   const N=sheet.N, LAYERS={FRAME:7, FRAME2:7, TITLE:7, NOTICE:1, LOGO:3, MODULES:8, PURLINS:1, BEAMS:6, COLUMNS:3, DIMS:7, SLAB:9, TEXT:7};
   const e=[]; const add=(...kv)=>{ for(let i=0;i<kv.length;i+=2) e.push(kv[i], kv[i+1]); };
@@ -832,15 +834,19 @@ function toDXF(sheet){
         for(const [px,py] of poly) add(0,'VERTEX',8,'LOGO',10,fx(X(it.x+px*kx)),20,fx(Y(it.y+it.h-py*ky)),30,0);
         add(0,'SEQEND',8,'LOGO'); } }
     else { const ha = it.a==='middle'?1: it.a==='end'?2:0;
-      add(0,'TEXT',8,it.l,10,fx(X(it.x)),20,fx(Y(it.y)),30,0,40,fx(it.h*N*0.72),1,clean(it.s),50,fx(it.rot));
+      add(0,'TEXT',8,it.l,10,fx(X(it.x)),20,fx(Y(it.y)),30,0,40,fx(it.h*N*0.72),1,clean(it.s),50,fx(it.rot),7,(it.cls==='b'||it.cls==='ttl')?'REGEN_AN_B':'REGEN_AN');
       if(ha) add(72,ha,11,fx(X(it.x)),21,fx(Y(it.y)),31,0); }
   }
   const W=sheet.paper.w*N, H=sheet.paper.h*N;
   const hdr=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','9','$INSUNITS','70','4',
     '9','$EXTMIN','10','0','20','0','30','0','9','$EXTMAX','10',fx(W),'20',fx(H),'30','0',
-    '9','$LIMMIN','10','0','20','0','9','$LIMMAX','10',fx(W),'20',fx(H),'9','$DIMSCALE','40',String(N),'9','$LTSCALE','40',String(N),'0','ENDSEC',
+    '9','$LIMMIN','10','0','20','0','9','$LIMMAX','10',fx(W),'20',fx(H),'9','$DIMSCALE','40',String(N),'9','$LTSCALE','40',String(N),'9','$TEXTSTYLE','7','REGEN_AN','0','ENDSEC',
     '0','SECTION','2','TABLES','0','TABLE','2','LTYPE','70','1','0','LTYPE','2','CONTINUOUS','70','0','3','Solid line','72','65','73','0','40','0.0','0','ENDTAB',
-    '0','TABLE','2','LAYER','70',String(Object.keys(LAYERS).length)];
+    '0','TABLE','2','STYLE','70','3'];
+  // Text styles: Arial Narrow (regular + bold) — TrueType, read from the PC's Fonts folder by AutoCAD
+  for (const [nm,file] of [['STANDARD',DXF_FONT.regular],['REGEN_AN',DXF_FONT.regular],['REGEN_AN_B',DXF_FONT.bold]])
+    hdr.push('0','STYLE','2',nm,'70','0','40','0.0','41','1.0','50','0.0','71','0','42','2.5','3',file,'4','');
+  hdr.push('0','ENDTAB','0','TABLE','2','LAYER','70',String(Object.keys(LAYERS).length));
   for(const [n,c] of Object.entries(LAYERS)) hdr.push('0','LAYER','2',n,'70','0','62',String(c),'6','CONTINUOUS');
   hdr.push('0','ENDTAB','0','ENDSEC','0','SECTION','2','ENTITIES');
   return hdr.concat(e.map(String)).concat(['0','ENDSEC','0','EOF']).join('\r\n');
